@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL") // mysql://cipherpay:cipherpay@127.0.0.1:3307/cipherpay_server
+}
+
+model users {
+  id           BigInt   @id @default(autoincrement())
+  owner_key    String   @unique @db.VarChar(66)
+  auth_pub_x   String   @db.VarChar(66)
+  auth_pub_y   String   @db.VarChar(66)
+  display_name String?  @db.VarChar(64)
+  avatar_url   String?  @db.VarChar(256)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now()) @updatedAt
+
+  sessions     sessions[]
+  contacts     contacts[]
+}
+
+model sessions {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  nonce      String   @db.VarChar(96)
+  created_at DateTime @default(now())
+  expires_at DateTime
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+}
+
+model messages {
+  id            BigInt   @id @default(autoincrement())
+  recipient_key String   @db.VarChar(66)
+  sender_key    String?  @db.VarChar(66)
+  ciphertext    Bytes
+  kind          String   @db.VarChar(24)
+  content_hash  String   @unique @db.VarChar(66)
+  created_at    DateTime @default(now())
+  read_at       DateTime?
+
+  @@index([recipient_key, created_at(sort: Desc)])
+  @@index([sender_key, created_at(sort: Desc)])
+  @@index([read_at])
+}
+
+model tx {
+  id            BigInt   @id @default(autoincrement())
+  chain         String   @db.VarChar(16)
+  commitment    String   @unique @db.VarChar(66)
+  leaf_index    Int
+  merkle_root   String   @db.VarChar(66)
+  signature     String?  @db.VarChar(120)
+  event         String   @db.VarChar(24)
+  recipient_key String?  @db.VarChar(66)
+  sender_key    String?  @db.VarChar(66)
+  timestamp     DateTime @default(now())
+
+  @@index([leaf_index])
+  @@index([event, timestamp(sort: Desc)])
+  @@index([recipient_key, timestamp(sort: Desc)])
+  @@index([sender_key, timestamp(sort: Desc)])
+}
+
+model contacts {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  alias      String   @db.VarChar(64)
+  peer_key   String   @db.VarChar(66)
+  created_at DateTime @default(now())
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([user_id])
+  @@unique([user_id, peer_key])
+}
+
+model api_keys {
+  id         BigInt   @id @default(autoincrement())
+  api_key    String   @unique @db.VarChar(100)
+  tenant     String   @db.VarChar(64)
+  disabled   Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([tenant])
+}
