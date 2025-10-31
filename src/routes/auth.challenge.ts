@@ -13,14 +13,14 @@ export default async function (app: FastifyInstance) {
       .parse(req.body);
 
     let user = await prisma.users.findUnique({
-      where: { owner_key: body.ownerKey },
+      where: { owner_cipherpay_pub_key: body.ownerKey },
     });
     if (!user) {
       if (!body.authPubKey)
         return rep.code(400).send({ error: "missing_authPubKey_for_new_user" });
       user = await prisma.users.create({
         data: {
-          owner_key: body.ownerKey,
+          owner_cipherpay_pub_key: body.ownerKey,
           auth_pub_x: body.authPubKey.x,
           auth_pub_y: body.authPubKey.y,
         },

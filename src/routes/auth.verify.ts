@@ -26,7 +26,7 @@ export default async function (app: FastifyInstance) {
 
     const body = BodyZ.parse(req.body);
 
-    const user = await prisma.users.findUnique({ where: { owner_key: body.ownerKey } });
+    const user = await prisma.users.findUnique({ where: { owner_cipherpay_pub_key: body.ownerKey } });
     if (!user) return rep.code(400).send({ error: "unknown_user" });
 
     const session = await prisma.sessions.findFirst({
@@ -56,10 +56,10 @@ export default async function (app: FastifyInstance) {
     }
 
     const token = app.jwt.sign(
-      { sub: String(user.id), ownerKey: user.owner_key },
+      { sub: String(user.id), ownerKey: user.owner_cipherpay_pub_key },
       { expiresIn: "1h" }
     );
 
-    return rep.send({ token, user: { id: user.id, ownerKey: user.owner_key } });
+    return rep.send({ token, user: { id: user.id, ownerKey: user.owner_cipherpay_pub_key } });
   });
 }

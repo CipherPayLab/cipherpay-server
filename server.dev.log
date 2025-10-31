@@ -1,0 +1,16 @@
+nohup: ignoring input
+
+/home/sean/cipherpay-server/node_modules/fastify/lib/pluginUtils.js:125
+    throw new FST_ERR_PLUGIN_VERSION_MISMATCH(meta.name, requiredVersion, this.version)
+          ^
+FastifyError [Error]: fastify-plugin: @fastify/cors - expected '5.x' fastify version, '4.29.1' is installed
+    at Object.checkVersion (/home/sean/cipherpay-server/node_modules/fastify/lib/pluginUtils.js:125:11)
+    at Object.registerPlugin (/home/sean/cipherpay-server/node_modules/fastify/lib/pluginUtils.js:148:16)
+    at Boot.override (/home/sean/cipherpay-server/node_modules/fastify/lib/pluginOverride.js:28:57)
+    at Boot._loadPlugin (/home/sean/cipherpay-server/node_modules/avvio/boot.js:425:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'FST_ERR_PLUGIN_VERSION_MISMATCH',
+  statusCode: 500
+}
+
+Node.js v20.19.4

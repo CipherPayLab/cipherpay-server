@@ -6,7 +6,6 @@ import { env } from "../config/env.js";
 export default fp(async (app: FastifyInstance) => {
   await app.register(jwt, {
     secret: env.jwtSecret,
-    sign: { issuer: env.jwtIssuer },
   });
 
   app.decorate("auth", async (request: any, reply: any) => {
@@ -18,12 +17,16 @@ export default fp(async (app: FastifyInstance) => {
   });
 });
 
+// Configure the user/payload type via @fastify/jwt module augmentation
+declare module "@fastify/jwt" {
+  interface FastifyJWT {
+    payload: { sub: string; ownerKey: string; id?: string };
+    user: { sub: string; ownerKey: string; id?: string };
+  }
+}
+
 declare module "fastify" {
   interface FastifyInstance {
     auth: (req: any, rep: any) => Promise<void>;
-  }
-  interface FastifyRequest {
-    jwtVerify: any;
-    user?: { sub: string; ownerKey: string; id: string };
   }
 }

@@ -1,3 +1,12 @@
+# delete database
+docker compose down -v
+
+# generate database
+docker compose up -d db
+
+# generate tables
+npx prisma db push
+
 # install
 
 npm i prisma @prisma/client
@@ -19,9 +28,9 @@ const prisma = new PrismaClient();
 // create-or-link user
 export async function upsertUser(ownerKey: string, authPubX: string, authPubY: string) {
 return prisma.users.upsert({
-where: { owner_key: ownerKey },
+where: { owner_cipherpay_pub_key: ownerKey },
 update: { auth_pub_x: authPubX, auth_pub_y: authPubY },
-create: { owner_key: ownerKey, auth_pub_x: authPubX, auth_pub_y: authPubY },
+create: { owner_cipherpay_pub_key: ownerKey, auth_pub_x: authPubX, auth_pub_y: authPubY },
 });
 }
 

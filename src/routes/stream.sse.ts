@@ -20,7 +20,7 @@ export default async function (app: FastifyInstance) {
       // @ts-ignore
       app.redisSub = sub;
     }
-    await sub.subscribe(`inbox:${q.recipientKey}`, (msg) => {
+    await sub.subscribe(`inbox:${q.recipientKey}`, (msg: string) => {
       rep.raw.write(`event: message\ndata: ${msg}\n\n`);
     });
 

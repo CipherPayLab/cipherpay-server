@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { TOKENS, tokenIdOf } from "cipherpay-sdk"; // shared registry
-import { bigintifySignals } from "cipherpay-sdk/dist/utils/zk.js";
+import { TOKENS, bigintifySignals } from "cipherpay-sdk"; // shared registry + helpers
 
 /** 0x-prefixed hex (lower/upper both OK) */
 export const Hex0xZ = z.string().regex(/^0x[0-9a-fA-F]+$/);
@@ -38,9 +37,9 @@ export function normalizeDepositSignals(s: DepositSignals) {
   };
 }
 
-/** Optional helper to ensure tokenId maps to the same numeric ID the SDK/chain expects */
+/** Optional helper to ensure tokenId maps to known registry entry; returns same string */
 export function ensureKnownTokenId(tokenId: string) {
-  const tid = tokenIdOf(tokenId as keyof typeof TOKENS);
-  if (tid === undefined || tid === null) throw new Error(`Unknown tokenId: ${tokenId}`);
-  return tid;
+  const known = TOKENS[tokenId as keyof typeof TOKENS];
+  if (!known) throw new Error(`Unknown tokenId: ${tokenId}`);
+  return tokenId;
 }

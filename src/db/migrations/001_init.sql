@@ -7,24 +7,44 @@ USE `cipherpay_server`;
 
 CREATE TABLE IF NOT EXISTS `users` (
   `id`              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `owner_key`       VARCHAR(66)     NOT NULL,
+  `owner_cipherpay_pub_key` VARCHAR(66) NOT NULL,
+  `owner_curve_pub_x` VARCHAR(66) NULL,
+  `owner_curve_pub_y` VARCHAR(66) NULL,
   `auth_pub_x`      VARCHAR(66)     NOT NULL,
   `auth_pub_y`      VARCHAR(66)     NOT NULL,
   `display_name`    VARCHAR(64)     NULL,
   `avatar_url`      VARCHAR(256)    NULL,
-  `created_at`      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `created_at`      TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`      TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_users_owner_key` (`owner_key`),
+  UNIQUE KEY `uq_users_owner_key` (`owner_cipherpay_pub_key`),
   KEY `ix_users_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `user_wallets` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`    BIGINT UNSIGNED NOT NULL,
+  `chain`      VARCHAR(16)     NOT NULL,     -- e.g. 'solana', 'ethereum', 'bitcoin'
+  `address`    VARCHAR(128)    NOT NULL,     -- base58 (Solana), 0x.. (EVM), bech32, etc.
+  `label`      VARCHAR(64)     NULL,         -- 'Main', 'Ledger', etc.
+  `is_primary` TINYINT(1)      NOT NULL DEFAULT 0,
+  `verified`   TINYINT(1)      NOT NULL DEFAULT 0,  -- set true after signature check
+  `created_at` TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at` TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  CONSTRAINT `fk_user_wallets_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE KEY `uq_user_wallets_user_chain_addr` (`user_id`,`chain`,`address`),
+  KEY `ix_user_wallets_user_chain` (`user_id`,`chain`),
+  KEY `ix_user_wallets_primary` (`user_id`,`is_primary`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `sessions` (
   `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id`     BIGINT UNSIGNED NOT NULL,
   `nonce`       VARCHAR(96)     NOT NULL,
-  `created_at`  TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `expires_at`  TIMESTAMP       NOT NULL,
+  `created_at`  TIMESTAMP(0)     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at`  TIMESTAMP(0)     NOT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_sessions_user_id` (`user_id`),
   KEY `ix_sessions_expires_at` (`expires_at`),
@@ -38,8 +58,8 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `ciphertext`     LONGBLOB        NOT NULL,
   `kind`           VARCHAR(24)     NOT NULL,
   `content_hash`   VARCHAR(66)     NOT NULL,
-  `created_at`     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `read_at`        TIMESTAMP       NULL DEFAULT NULL,
+  `created_at`     TIMESTAMP(0)     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `read_at`        TIMESTAMP(0)     NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_messages_content_hash` (`content_hash`),
   KEY `ix_messages_recipient_created` (`recipient_key`, `created_at` DESC),
@@ -57,7 +77,7 @@ CREATE TABLE IF NOT EXISTS `tx` (
   `event`         VARCHAR(24)     NOT NULL,
   `recipient_key` VARCHAR(66)     NULL,
   `sender_key`    VARCHAR(66)     NULL,
-  `timestamp`     TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `timestamp`     TIMESTAMP(0)     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_tx_commitment` (`commitment`),
   KEY `ix_tx_leaf_index` (`leaf_index`),
@@ -71,7 +91,7 @@ CREATE TABLE IF NOT EXISTS `contacts` (
   `user_id`    BIGINT UNSIGNED NOT NULL,
   `alias`      VARCHAR(64)     NOT NULL,
   `peer_key`   VARCHAR(66)     NOT NULL,
-  `created_at` TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` TIMESTAMP(0)     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `ix_contacts_user_id` (`user_id`),
   UNIQUE KEY `uq_contacts_user_peer` (`user_id`, `peer_key`),
@@ -83,7 +103,7 @@ CREATE TABLE IF NOT EXISTS `api_keys` (
   `api_key`    VARCHAR(100)    NOT NULL,
   `tenant`     VARCHAR(64)     NOT NULL,
   `disabled`   TINYINT(1)      NOT NULL DEFAULT 0,
-  `created_at` TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` TIMESTAMP(0)     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_api_keys_key` (`api_key`),
   KEY `ix_api_keys_tenant` (`tenant`)
