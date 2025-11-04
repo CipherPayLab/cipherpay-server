@@ -15,9 +15,12 @@ export default async function (app: FastifyInstance) {
     let user = await prisma.users.findUnique({
       where: { owner_cipherpay_pub_key: body.ownerKey },
     });
+    
+    // Handle new user creation
     if (!user) {
-      if (!body.authPubKey)
+      if (!body.authPubKey) {
         return rep.code(400).send({ error: "missing_authPubKey_for_new_user" });
+      }
       user = await prisma.users.create({
         data: {
           owner_cipherpay_pub_key: body.ownerKey,
@@ -25,6 +28,11 @@ export default async function (app: FastifyInstance) {
           auth_pub_y: body.authPubKey.y,
         },
       });
+    }
+    
+    // Verify existing user has auth pub key (required)
+    if (user && (!user.auth_pub_x || !user.auth_pub_y)) {
+      return rep.code(400).send({ error: "user_missing_auth_pub_key" });
     }
 
     const nonce = crypto.randomBytes(32).toString("hex");

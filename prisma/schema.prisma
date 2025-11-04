@@ -14,8 +14,8 @@ model users {
   owner_curve_pub_x         String?  @db.VarChar(66)
   owner_curve_pub_y         String?  @db.VarChar(66)
 
-  auth_pub_x                String   @db.VarChar(66)
-  auth_pub_y                String   @db.VarChar(66)
+  auth_pub_x                String   @db.VarChar(256)
+  auth_pub_y                String   @db.VarChar(256)
   display_name              String?  @db.VarChar(64)
   avatar_url                String?  @db.VarChar(256)
   created_at                DateTime @default(now())

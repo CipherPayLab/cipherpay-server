@@ -43,16 +43,34 @@ export default async function (app: FastifyInstance) {
       body.ownerKey as `0x${string}`
     );
 
-    const pub = body.authPubKey ?? { x: user.auth_pub_x, y: user.auth_pub_y };
-    const ok = await verifyBabyJubSig({ msgField, sig: body.signature, pub });
-    if (!ok) return rep.code(401).send({ error: "bad_signature" });
-
-    // If we provisioned user without pub at challenge time, bind it now
+    // Verify user has auth pub key (required)
     if (!user.auth_pub_x || !user.auth_pub_y) {
-      await prisma.users.update({
-        where: { id: user.id },
-        data: { auth_pub_x: pub.x, auth_pub_y: pub.y },
-      });
+      return rep.code(400).send({ error: "user_missing_auth_pub_key" });
+    }
+    
+    // Use provided authPubKey or existing user's auth pub key
+    const pub = body.authPubKey ?? { x: user.auth_pub_x, y: user.auth_pub_y };
+    
+    // Verify that we have a valid pub key to verify against
+    if (!pub.x || !pub.y) {
+      return rep.code(400).send({ error: "missing_auth_pub_key" });
+    }
+    
+    console.log('[auth.verify] About to verify signature with:', {
+      msgField: msgField.toString().substring(0, 50) + '...',
+      pub: { x: pub.x.substring(0, 20) + '...', y: pub.y.substring(0, 20) + '...' },
+      sig: {
+        R8x: body.signature.R8x.substring(0, 20) + '...',
+        R8y: body.signature.R8y.substring(0, 20) + '...',
+        S: body.signature.S.substring(0, 20) + '...'
+      }
+    });
+    
+    const ok = await verifyBabyJubSig({ msgField, sig: body.signature, pub });
+    console.log('[auth.verify] Signature verification result:', ok);
+    
+    if (!ok) {
+      return rep.code(401).send({ error: "bad_signature" });
     }
 
     const token = app.jwt.sign(
