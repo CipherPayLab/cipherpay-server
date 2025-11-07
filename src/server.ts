@@ -1,0 +1,46 @@
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import rate from "@fastify/rate-limit";
+import jwt from "./auth/jwt.js";
+import { env } from "./config/env.js";
+
+// Routes
+import authChallenge from "./routes/auth.challenge.js";
+import authVerify from "./routes/auth.verify.js";
+import messagesPost from "./routes/messages.post.js";
+import messagesInbox from "./routes/messages.inbox.js";
+import streamSse from "./routes/stream.sse.js";
+
+// add imports
+import usersMe from "./routes/users.get.me.js";
+import txList from "./routes/tx.get.list.js";
+import commitmentsPost from "./routes/commitments.post.js";
+import merkleProofGet from "./routes/merkle-proof.get.js";
+
+const app = Fastify({ logger: true });
+
+await app.register(cors, { origin: env.corsOrigin, credentials: true });
+await app.register(rate, { max: 100, timeWindow: "1 minute" });
+await app.register(jwt);
+
+app.get("/healthz", async () => ({ ok: true }));
+
+await app.register(authChallenge);
+await app.register(authVerify);
+await app.register(messagesPost);
+await app.register(messagesInbox);
+await app.register(streamSse);
+
+// register
+await app.register(usersMe);
+await app.register(txList);
+await app.register(commitmentsPost);
+await app.register(merkleProofGet);
+
+app
+  .listen({ port: env.port, host: "0.0.0.0" })
+  .then((addr) => app.log.info(`cipherpay-server listening on ${addr}`))
+  .catch((err) => {
+    app.log.error(err);
+    process.exit(1);
+  });

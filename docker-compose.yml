@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: cipherpay-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: cipherpay_server
+      MYSQL_USER: cipherpay
+      MYSQL_PASSWORD: cipherpay
+      MYSQL_ROOT_PASSWORD: rootpass
+      # Strongly consider mounting custom my.cnf for utf8mb4 defaults if needed
+    command:
+      [
+        "--character-set-server=utf8mb4",
+        "--collation-server=utf8mb4_0900_ai_ci",
+        "--default-authentication-plugin=mysql_native_password",
+        "--performance-schema=ON",
+        "--sql-mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION",
+      ]
+    ports:
+      - "3307:3306" # host:container
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./src/db/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u root -prootpass || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Optional admin UI; uncomment if you want it
+  # adminer:
+  #   image: adminer
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     mysql:
+  #       condition: service_healthy
+
+volumes:
+  mysql-data:
