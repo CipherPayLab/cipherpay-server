@@ -15,6 +15,8 @@
       "@fastify/jwt": "^8.0.1",
       "@fastify/rate-limit": "^8.0.0",
       "@prisma/client": "^5.22.0",
+      "@solana/spl-token": "^0.4.8",
+      "@solana/web3.js": "^1.98.4",
       "cipherpay-sdk": "file:../cipherpay-sdk",
       "circomlibjs": "^0.1.7",
       "fastify": "^4.28.1",

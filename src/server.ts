@@ -16,6 +16,8 @@ import usersMe from "./routes/users.get.me.js";
 import txList from "./routes/tx.get.list.js";
 import commitmentsPost from "./routes/commitments.post.js";
 import merkleProofGet from "./routes/merkle-proof.get.js";
+import depositPrepare from "./routes/deposit.prepare.post.js";
+import depositSubmit from "./routes/deposit.submit.post.js";
 
 const app = Fastify({ logger: true });
 
@@ -36,6 +38,8 @@ await app.register(usersMe);
 await app.register(txList);
 await app.register(commitmentsPost);
 await app.register(merkleProofGet);
+await app.register(depositPrepare);
+await app.register(depositSubmit);
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })

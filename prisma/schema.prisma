@@ -18,6 +18,12 @@ model users {
   auth_pub_y                String   @db.VarChar(256)
   display_name              String?  @db.VarChar(64)
   avatar_url                String?  @db.VarChar(256)
+  
+  // Solana wallet address (used to derive ATAs)
+  solana_wallet_address     String?  @db.VarChar(44)
+  // Associated Token Accounts (ATAs) for common tokens
+  wsol_ata                   String?  @db.VarChar(44)  // WSOL ATA address
+  
   created_at                DateTime @default(now())
   updated_at                DateTime @default(now()) @updatedAt
 
