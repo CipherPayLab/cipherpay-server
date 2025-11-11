@@ -1,15 +1,13 @@
-version: "3.9"
-
 services:
   db:
     image: mysql:8.0
-    container_name: cipherpay-mysql
+    container_name: cipherpay-server
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: cipherpay_server
       MYSQL_USER: cipherpay
       MYSQL_PASSWORD: cipherpay
-      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_ROOT_PASSWORD: root
       # Strongly consider mounting custom my.cnf for utf8mb4 defaults if needed
     command:
       [

@@ -10,10 +10,11 @@ CREATE TABLE IF NOT EXISTS `users` (
   `owner_cipherpay_pub_key` VARCHAR(66) NOT NULL,
   `owner_curve_pub_x` VARCHAR(66) NULL,
   `owner_curve_pub_y` VARCHAR(66) NULL,
-  `auth_pub_x`      VARCHAR(66)     NOT NULL,
-  `auth_pub_y`      VARCHAR(66)     NOT NULL,
+  `auth_pub_x`      VARCHAR(256)    NOT NULL,
+  `auth_pub_y`      VARCHAR(256)    NOT NULL,
   `display_name`    VARCHAR(64)     NULL,
   `avatar_url`      VARCHAR(256)    NULL,
+  `solana_wallet_address` VARCHAR(44) NULL,
   `created_at`      TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updated_at`      TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`id`),
@@ -107,4 +108,19 @@ CREATE TABLE IF NOT EXISTS `api_keys` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_api_keys_key` (`api_key`),
   KEY `ix_api_keys_tenant` (`tenant`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `user_atas` (
+  `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id`     BIGINT UNSIGNED NOT NULL,
+  `token_mint`  VARCHAR(44)     NOT NULL,
+  `ata_address` VARCHAR(44)     NOT NULL,
+  `created_at`  TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updated_at`  TIMESTAMP(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  CONSTRAINT `fk_user_atas_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  UNIQUE KEY `uq_user_atas_user_token` (`user_id`, `token_mint`),
+  KEY `ix_user_atas_user_id` (`user_id`),
+  KEY `ix_user_atas_user_token` (`user_id`, `token_mint`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

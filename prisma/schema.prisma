@@ -21,8 +21,6 @@ model users {
   
   // Solana wallet address (used to derive ATAs)
   solana_wallet_address     String?  @db.VarChar(44)
-  // Associated Token Accounts (ATAs) for common tokens
-  wsol_ata                   String?  @db.VarChar(44)  // WSOL ATA address
   
   created_at                DateTime @default(now())
   updated_at                DateTime @default(now()) @updatedAt
@@ -30,6 +28,7 @@ model users {
   sessions   sessions[]
   contacts   contacts[]
   wallets    user_wallets[]
+  atas       user_atas[]
 }
 
 model user_wallets {
@@ -115,4 +114,19 @@ model api_keys {
   created_at DateTime @default(now()) @db.Timestamp(0)
 
   @@index([tenant], map: "ix_api_keys_tenant")
+}
+
+model user_atas {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt   @db.UnsignedBigInt
+  token_mint String   @db.VarChar(44)  // Token mint address (e.g., WSOL, wETH, wBTC)
+  ata_address String  @db.VarChar(44)  // The ATA address for this token
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, token_mint])
+  @@index([user_id])
+  @@index([user_id, token_mint])
 }
