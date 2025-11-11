@@ -18,6 +18,9 @@ import commitmentsPost from "./routes/commitments.post.js";
 import merkleProofGet from "./routes/merkle-proof.get.js";
 import depositPrepare from "./routes/deposit.prepare.post.js";
 import depositSubmit from "./routes/deposit.submit.post.js";
+import nullifiersSync from "./routes/nullifiers.sync.post.js";
+import accountOverview from "./routes/account.overview.post.js";
+import messagesGet from "./routes/messages.get.js";
 
 const app = Fastify({ logger: true });
 
@@ -40,6 +43,9 @@ await app.register(commitmentsPost);
 await app.register(merkleProofGet);
 await app.register(depositPrepare);
 await app.register(depositSubmit);
+await app.register(nullifiersSync);
+await app.register(accountOverview);
+await app.register(messagesGet);
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })
