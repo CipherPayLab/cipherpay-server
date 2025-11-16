@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import rate from "@fastify/rate-limit";
 import jwt from "./auth/jwt.js";
 import { env } from "./config/env.js";
+import { eventListener } from "./services/eventListener.js";
 
 // Routes
 import authChallenge from "./routes/auth.challenge.js";
@@ -21,6 +22,7 @@ import depositSubmit from "./routes/deposit.submit.post.js";
 import nullifiersSync from "./routes/nullifiers.sync.post.js";
 import accountOverview from "./routes/account.overview.post.js";
 import messagesGet from "./routes/messages.get.js";
+import relayerInfo from "./routes/relayer.info.get.js";
 
 const app = Fastify({ logger: true });
 
@@ -46,6 +48,27 @@ await app.register(depositSubmit);
 await app.register(nullifiersSync);
 await app.register(accountOverview);
 await app.register(messagesGet);
+await app.register(relayerInfo);
+
+// Start on-chain event monitoring
+eventListener.start().catch((err) => {
+  app.log.error({ err }, "Failed to start event listener");
+});
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  app.log.info("SIGTERM received, shutting down gracefully...");
+  await eventListener.stop();
+  await app.close();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  app.log.info("SIGINT received, shutting down gracefully...");
+  await eventListener.stop();
+  await app.close();
+  process.exit(0);
+});
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })
