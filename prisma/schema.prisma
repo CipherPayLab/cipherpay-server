@@ -21,8 +21,6 @@ model users {
   
   // Solana wallet address (used to derive ATAs)
   solana_wallet_address     String?  @db.VarChar(44)
-  // Associated Token Accounts (ATAs) for common tokens
-  wsol_ata                   String?  @db.VarChar(44)  // WSOL ATA address
   
   created_at                DateTime @default(now())
   updated_at                DateTime @default(now()) @updatedAt
@@ -30,6 +28,7 @@ model users {
   sessions   sessions[]
   contacts   contacts[]
   wallets    user_wallets[]
+  atas       user_atas[]
 }
 
 model user_wallets {
@@ -84,6 +83,7 @@ model tx {
   leaf_index    Int      @db.UnsignedInt
   merkle_root   String   @db.VarChar(66)
   signature     String?  @db.VarChar(120)
+  nullifier_hex String?  @db.VarChar(64)  // Nullifier extracted from transaction
   event         String   @db.VarChar(24)
   recipient_key String?  @db.VarChar(66)
   sender_key    String?  @db.VarChar(66)
@@ -93,6 +93,7 @@ model tx {
   @@index([leaf_index], map: "ix_tx_leaf_index")
   @@index([recipient_key, timestamp(sort: Desc)], map: "ix_tx_recipient_time")
   @@index([sender_key, timestamp(sort: Desc)], map: "ix_tx_sender_time")
+  @@index([nullifier_hex], map: "ix_tx_nullifier")
 }
 
 model contacts {
@@ -115,4 +116,37 @@ model api_keys {
   created_at DateTime @default(now()) @db.Timestamp(0)
 
   @@index([tenant], map: "ix_api_keys_tenant")
+}
+
+model user_atas {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt   @db.UnsignedBigInt
+  token_mint String   @db.VarChar(44)  // Token mint address (e.g., WSOL, wETH, wBTC)
+  ata_address String  @db.VarChar(44)  // The ATA address for this token
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, token_mint])
+  @@index([user_id])
+  @@index([user_id, token_mint])
+}
+
+model nullifiers {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  nullifier     Bytes     @db.Binary(32)  // 32-byte nullifier (little-endian)
+  nullifier_hex String    @unique @db.VarChar(64)  // hex representation for queries
+  pda_address   String    @unique @db.VarChar(44)  // Solana PDA address for this nullifier
+  used          Boolean   @default(false)  // true if spent on-chain
+  tx_signature  String?   @db.VarChar(88)  // Solana transaction signature that spent it
+  event_type    String?   @db.VarChar(24)  // 'transfer' or 'withdraw'
+  spent_at      DateTime? @db.Timestamp(0)  // when it was spent (from on-chain)
+  synced_at     DateTime  @default(now()) @db.Timestamp(0)  // last sync time
+  created_at    DateTime  @default(now()) @db.Timestamp(0)
+  updated_at    DateTime  @default(now()) @updatedAt @db.Timestamp(0)
+
+  @@index([used], map: "ix_nullifiers_used")
+  @@index([synced_at], map: "ix_nullifiers_synced")
+  @@index([tx_signature], map: "ix_nullifiers_tx")
 }
