@@ -59,8 +59,10 @@ export default async function (app: FastifyInstance) {
       // Default to authenticated user's messages
       if (query.recipientKey) {
         where.recipient_key = query.recipientKey;
+        req.log.info({ recipientKey: query.recipientKey }, "[messages.get] Using query recipientKey");
       } else {
         where.recipient_key = ownerKey;
+        req.log.info({ ownerKey, ownerKeyLength: ownerKey.length }, "[messages.get] Using authenticated ownerKey for filtering");
       }
 
       if (query.senderKey) {
