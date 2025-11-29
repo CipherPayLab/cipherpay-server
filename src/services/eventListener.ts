@@ -4,6 +4,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { prisma } from "../db/prisma.js";
 import { createClient, RedisClientType } from "redis";
+import { upsertNullifier } from "./nullifiers.js";
 
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "http://localhost:8899";
 const PROGRAM_ID = process.env.SOLANA_PROGRAM_ID || "BCrt2kn5HR4B7CHEMSBacekhzVTKYhzAQAB5YNkr5kJf";
@@ -145,27 +146,55 @@ export class OnChainEventListener {
     const discriminator = eventData.slice(0, 8);
     const data = eventData.slice(8);
 
-    // Event discriminators (computed as first 8 bytes of sha256("event:<EventName>"))
-    // You can compute these using: anchor idl events or by checking the IDL
-    // For now, we'll try to identify by checking known patterns
+    // Event discriminators from IDL (first 8 bytes of sha256("event:<EventName>"))
+    const DISCRIMINATORS = {
+      depositCompleted: Buffer.from([87, 191, 139, 46, 172, 192, 191, 52]),
+      transferCompleted: Buffer.from([208, 78, 51, 21, 201, 117, 155, 42]),
+      withdrawCompleted: Buffer.from([180, 77, 152, 99, 248, 179, 163, 44]),
+    };
 
-    try {
-      // Try parsing as DepositCompleted
-      await this.tryParseDepositCompleted(discriminator, data, txSignature);
-    } catch (e1) {
+    // Check discriminator first to determine event type
+    if (discriminator.equals(DISCRIMINATORS.depositCompleted)) {
       try {
-        // Try parsing as TransferCompleted
-        await this.tryParseTransferCompleted(discriminator, data, txSignature);
-      } catch (e2) {
-        try {
-          // Try parsing as WithdrawCompleted
-          await this.tryParseWithdrawCompleted(discriminator, data, txSignature);
-        } catch (e3) {
-          // Unknown event or parsing error
-          console.log("[EventListener] Could not parse event (unknown type or format)");
-        }
+        await this.tryParseDepositCompleted(discriminator, data, txSignature);
+        return;
+      } catch (e) {
+        console.error("[EventListener] Failed to parse DepositCompleted event:", e);
+        return;
       }
     }
+
+    if (discriminator.equals(DISCRIMINATORS.transferCompleted)) {
+      try {
+        await this.tryParseTransferCompleted(discriminator, data, txSignature);
+        return;
+      } catch (e) {
+        console.error("[EventListener] Failed to parse TransferCompleted event:", e);
+        return;
+      }
+    }
+
+    if (discriminator.equals(DISCRIMINATORS.withdrawCompleted)) {
+      try {
+        await this.tryParseWithdrawCompleted(discriminator, data, txSignature);
+        return;
+      } catch (e) {
+        console.error("[EventListener] Failed to parse WithdrawCompleted event:", e);
+        return;
+      }
+    }
+
+    // Unknown event discriminator
+    console.log("[EventListener] Unknown event discriminator:", {
+      discriminator: Array.from(discriminator),
+      discriminatorHex: discriminator.toString("hex"),
+      dataLength: data.length,
+      expectedDiscriminators: {
+        depositCompleted: Array.from(DISCRIMINATORS.depositCompleted),
+        transferCompleted: Array.from(DISCRIMINATORS.transferCompleted),
+        withdrawCompleted: Array.from(DISCRIMINATORS.withdrawCompleted),
+      },
+    });
   }
 
   private async tryParseDepositCompleted(
@@ -275,6 +304,7 @@ export class OnChainEventListener {
     const mint = new PublicKey(data.slice(offset, offset + 32));
 
     console.log("[EventListener] ✅ TransferCompleted event:", {
+      nullifier: toHex(nullifier),
       out1: toHex(out1Commitment),
       out2: toHex(out2Commitment),
       index: nextLeafIndex,
@@ -395,6 +425,25 @@ export class OnChainEventListener {
 
   private async storeTransferEvent(event: any, txSignature: string) {
     try {
+      // Event nullifier comes as number[] (bytes from Anchor event)
+      // Anchor events provide field elements as 32-byte arrays in little-endian format
+      // Use the bytes directly to match nullifierToHex format
+      const nullifierBytes = Buffer.from(event.nullifier);
+      const nullifierHex = nullifierBytes.toString("hex");
+
+      // Store nullifier in nullifiers table
+      try {
+        await upsertNullifier(nullifierBytes, {
+          used: true,
+          txSignature,
+          spentAt: new Date(),
+          eventType: "transfer",
+        });
+      } catch (nullifierError) {
+        console.error("[EventListener] Failed to save nullifier:", nullifierError);
+        // Continue with storing commitments even if nullifier save fails
+      }
+
       // Store out1
       await prisma.tx.upsert({
         where: { commitment: toHex(event.out1Commitment) },
@@ -403,6 +452,7 @@ export class OnChainEventListener {
           merkle_root: toHex(event.newMerkleRoot1),
           signature: txSignature,
           event: "TransferCompleted",
+          nullifier_hex: nullifierHex,
         },
         create: {
           chain: "solana",
@@ -411,6 +461,7 @@ export class OnChainEventListener {
           merkle_root: toHex(event.newMerkleRoot1),
           signature: txSignature,
           event: "TransferCompleted",
+          nullifier_hex: nullifierHex,
         },
       });
 
@@ -422,6 +473,7 @@ export class OnChainEventListener {
           merkle_root: toHex(event.newMerkleRoot2),
           signature: txSignature,
           event: "TransferCompleted",
+          nullifier_hex: nullifierHex,
         },
         create: {
           chain: "solana",
@@ -430,10 +482,11 @@ export class OnChainEventListener {
           merkle_root: toHex(event.newMerkleRoot2),
           signature: txSignature,
           event: "TransferCompleted",
+          nullifier_hex: nullifierHex,
         },
       });
 
-      console.log(`[EventListener] Stored TransferCompleted (2 commitments) in database`);
+      console.log(`[EventListener] Stored TransferCompleted (2 commitments + nullifier) in database`);
     } catch (error) {
       console.error("[EventListener] Failed to store TransferCompleted:", error);
     }
@@ -441,9 +494,23 @@ export class OnChainEventListener {
 
   private async storeWithdrawEvent(event: any, txSignature: string) {
     try {
+      // Event nullifier comes as number[] (bytes from Anchor event)
+      // Anchor events provide field elements as 32-byte arrays in little-endian format
+      // Use the bytes directly to match nullifierToHex format
+      const nullifierBytes = Buffer.from(event.nullifier);
+      const nullifierHex = nullifierBytes.toString("hex");
+
+      // Store nullifier in nullifiers table
+      await upsertNullifier(nullifierBytes, {
+        used: true,
+        txSignature,
+        spentAt: new Date(),
+        eventType: "withdraw",
+      });
+
       // For withdrawals, we don't have a commitment to store, but we can track the nullifier
       // We'll use a special format for the commitment field to track withdrawals
-      const withdrawId = toHex(event.nullifier);
+      const withdrawId = nullifierHex;
       
       await prisma.tx.upsert({
         where: { commitment: withdrawId },
@@ -452,6 +519,7 @@ export class OnChainEventListener {
           merkle_root: toHex(event.merkleRootUsed),
           signature: txSignature,
           event: "WithdrawCompleted",
+          nullifier_hex: nullifierHex,
         },
         create: {
           chain: "solana",
@@ -460,10 +528,11 @@ export class OnChainEventListener {
           merkle_root: toHex(event.merkleRootUsed),
           signature: txSignature,
           event: "WithdrawCompleted",
+          nullifier_hex: nullifierHex,
         },
       });
 
-      console.log(`[EventListener] Stored WithdrawCompleted in database`);
+      console.log(`[EventListener] Stored WithdrawCompleted (nullifier) in database`);
     } catch (error) {
       console.error("[EventListener] Failed to store WithdrawCompleted:", error);
     }

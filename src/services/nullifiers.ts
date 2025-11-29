@@ -72,7 +72,7 @@ export async function checkNullifierOnChain(
  */
 export async function upsertNullifier(
   nullifierBytes: Buffer | Uint8Array,
-  onChainData: { used: boolean; txSignature?: string; spentAt?: Date }
+  onChainData: { used: boolean; txSignature?: string; spentAt?: Date; eventType?: string }
 ): Promise<void> {
   const nullifierHex = Buffer.from(nullifierBytes).toString("hex");
   const pda = deriveNullifierPda(nullifierBytes);
@@ -86,6 +86,7 @@ export async function upsertNullifier(
         used: onChainData.used,
         tx_signature: onChainData.txSignature || undefined,
         spent_at: onChainData.spentAt || undefined,
+        event_type: onChainData.eventType || undefined,
         synced_at: new Date(),
       },
       create: {
@@ -95,36 +96,46 @@ export async function upsertNullifier(
         used: onChainData.used,
         tx_signature: onChainData.txSignature || null,
         spent_at: onChainData.spentAt || null,
+        event_type: onChainData.eventType || null,
         synced_at: new Date(),
       },
     });
   } catch (error) {
+    console.warn("[nullifiers] Prisma upsert failed, falling back to raw SQL:", error);
     // Fallback to raw SQL if Prisma model not available yet
-    await prisma.$executeRaw`
-      INSERT INTO nullifiers (
-        nullifier,
-        nullifier_hex,
-        pda_address,
-        used,
-        tx_signature,
-        spent_at,
-        synced_at
-      ) VALUES (
-        ${nullifierBuffer},
-        ${nullifierHex},
-        ${pda.toBase58()},
-        ${onChainData.used ? 1 : 0},
-        ${onChainData.txSignature || null},
-        ${onChainData.spentAt || null},
-        NOW()
-      )
-      ON DUPLICATE KEY UPDATE
-        used = VALUES(used),
-        tx_signature = COALESCE(VALUES(tx_signature), tx_signature),
-        spent_at = COALESCE(VALUES(spent_at), spent_at),
-        synced_at = NOW(),
-        updated_at = NOW()
-    `;
+    try {
+      await prisma.$executeRaw`
+        INSERT INTO nullifiers (
+          nullifier,
+          nullifier_hex,
+          pda_address,
+          used,
+          tx_signature,
+          event_type,
+          spent_at,
+          synced_at
+        ) VALUES (
+          ${nullifierBuffer},
+          ${nullifierHex},
+          ${pda.toBase58()},
+          ${onChainData.used ? 1 : 0},
+          ${onChainData.txSignature || null},
+          ${onChainData.eventType || null},
+          ${onChainData.spentAt || null},
+          NOW()
+        )
+        ON DUPLICATE KEY UPDATE
+          used = VALUES(used),
+          tx_signature = COALESCE(VALUES(tx_signature), tx_signature),
+          event_type = COALESCE(VALUES(event_type), event_type),
+          spent_at = COALESCE(VALUES(spent_at), spent_at),
+          synced_at = NOW(),
+          updated_at = NOW()
+      `;
+    } catch (sqlError) {
+      console.error("[nullifiers] Both Prisma and raw SQL failed:", sqlError);
+      throw sqlError; // Re-throw to let caller handle
+    }
   }
 }
 
@@ -215,10 +226,13 @@ export async function isNullifierSpent(
   nullifierHex: string,
   checkOnChain: boolean = false
 ): Promise<boolean> {
+  // Normalize hex string (lowercase, no 0x prefix)
+  const normalizedHex = nullifierHex.toLowerCase().replace(/^0x/, '');
+  
   // Check database first using Prisma if available
   try {
     const nullifier = await (prisma as any).nullifiers.findUnique({
-      where: { nullifier_hex: nullifierHex },
+      where: { nullifier_hex: normalizedHex },
       select: { used: true },
     });
 
@@ -231,7 +245,7 @@ export async function isNullifierSpent(
       const nullifier = await prisma.$queryRaw<Array<{ used: number }>>`
         SELECT used
         FROM nullifiers
-        WHERE nullifier_hex = ${nullifierHex}
+        WHERE nullifier_hex = ${normalizedHex}
         LIMIT 1
       `;
 
@@ -246,7 +260,7 @@ export async function isNullifierSpent(
 
   // Not in database, check on-chain if requested
   if (checkOnChain) {
-    const nullifierBytes = Buffer.from(nullifierHex, "hex");
+    const nullifierBytes = Buffer.from(normalizedHex, "hex");
     const onChainData = await checkNullifierOnChain(nullifierBytes);
     
     if (onChainData) {

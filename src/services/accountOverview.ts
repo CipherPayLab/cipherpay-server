@@ -84,7 +84,7 @@ export async function computeAccountOverview(
     })
   );
 
-  const spendableNotes = results.filter((r) => !r.isSpent);
+  const spendableNotes = results.filter((r) => !r.isSpent && r.amount > 0n);
   const shieldedBalance = spendableNotes.reduce(
     (sum, r) => sum + r.amount,
     0n
