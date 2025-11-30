@@ -19,10 +19,13 @@ import commitmentsPost from "./routes/commitments.post.js";
 import merkleProofGet from "./routes/merkle-proof.get.js";
 import depositPrepare from "./routes/deposit.prepare.post.js";
 import depositSubmit from "./routes/deposit.submit.post.js";
+import transferPrepare from "./routes/transfer.prepare.post.js";
+import transferSubmit from "./routes/transfer.submit.post.js";
 import nullifiersSync from "./routes/nullifiers.sync.post.js";
 import accountOverview from "./routes/account.overview.post.js";
 import messagesGet from "./routes/messages.get.js";
 import relayerInfo from "./routes/relayer.info.get.js";
+import usersNoteEncPubKey from "./routes/users.get.note-enc-pub-key.js";
 
 const app = Fastify({ logger: true });
 
@@ -45,10 +48,13 @@ await app.register(commitmentsPost);
 await app.register(merkleProofGet);
 await app.register(depositPrepare);
 await app.register(depositSubmit);
+await app.register(transferPrepare);
+await app.register(transferSubmit);
 await app.register(nullifiersSync);
 await app.register(accountOverview);
 await app.register(messagesGet);
 await app.register(relayerInfo);
+await app.register(usersNoteEncPubKey);
 
 // Start on-chain event monitoring
 eventListener.start().catch((err) => {
