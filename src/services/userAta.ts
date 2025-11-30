@@ -94,6 +94,22 @@ export async function getUserSolanaWallet(
 }
 
 /**
+ * Get user's owner_cipherpay_pub_key from Solana wallet address (reverse lookup)
+ * @param solanaWalletAddress - Solana wallet address (base58)
+ * @returns owner_cipherpay_pub_key (0x...) or null if not found
+ */
+export async function getOwnerCipherPayPubKeyFromWallet(
+  solanaWalletAddress: string
+): Promise<string | null> {
+  const user = await prisma.users.findFirst({
+    where: { solana_wallet_address: solanaWalletAddress },
+    select: { owner_cipherpay_pub_key: true },
+  });
+  
+  return user?.owner_cipherpay_pub_key ?? null;
+}
+
+/**
  * Get all ATAs for a user by owner cipherpay pub key
  * @param ownerCipherPayPubKey - User's owner cipherpay public key (0x...)
  * @returns Map of token mint -> ATA address

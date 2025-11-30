@@ -14,6 +14,11 @@ model users {
   owner_curve_pub_x         String?  @db.VarChar(66)
   owner_curve_pub_y         String?  @db.VarChar(66)
 
+  // Note encryption public key (Curve25519 public key, base64 encoded, derived from wallet signature seed)
+  // Used for E2EE encryption of notes: sender queries this to get recipient's encryption public key
+  // This is a Curve25519 public key (32 bytes = 44 chars base64), NOT the BN254 pubKey
+  note_enc_pub_key          String?  @db.VarChar(128)  // Base64 encoded Curve25519 public key (44 chars + padding)
+
   auth_pub_x                String   @db.VarChar(256)
   auth_pub_y                String   @db.VarChar(256)
   display_name              String?  @db.VarChar(64)

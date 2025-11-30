@@ -25,6 +25,7 @@ import nullifiersSync from "./routes/nullifiers.sync.post.js";
 import accountOverview from "./routes/account.overview.post.js";
 import messagesGet from "./routes/messages.get.js";
 import relayerInfo from "./routes/relayer.info.get.js";
+import usersNoteEncPubKey from "./routes/users.get.note-enc-pub-key.js";
 
 const app = Fastify({ logger: true });
 
@@ -53,6 +54,7 @@ await app.register(nullifiersSync);
 await app.register(accountOverview);
 await app.register(messagesGet);
 await app.register(relayerInfo);
+await app.register(usersNoteEncPubKey);
 
 // Start on-chain event monitoring
 eventListener.start().catch((err) => {

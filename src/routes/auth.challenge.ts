@@ -12,6 +12,7 @@ export default async function (app: FastifyInstance) {
       .object({
         ownerKey: z.string().regex(/^0x[0-9a-fA-F]+$/),
         authPubKey: z.object({ x: z.string(), y: z.string() }).optional(),
+        noteEncPubKey: z.string().optional(), // Note encryption public key (Curve25519 public key, base64 encoded)
         solanaWalletAddress: z.string().optional(), // Optional: wallet address for ATA derivation
       })
       .parse(req.body);
@@ -37,6 +38,7 @@ export default async function (app: FastifyInstance) {
           owner_cipherpay_pub_key: body.ownerKey,
           auth_pub_x: body.authPubKey.x,
           auth_pub_y: body.authPubKey.y,
+          note_enc_pub_key: body.noteEncPubKey ?? null, // Store note encryption public key
           solana_wallet_address: body.solanaWalletAddress ?? null,
         },
       });
@@ -148,29 +150,42 @@ export default async function (app: FastifyInstance) {
             req.log.info({ walletId: existingWallet.id }, "Wallet already exists for existing user, skipping creation");
           }
           
-          // Update wallet address in users table if different
+          // Update wallet address and note_enc_pub_key in users table if different
           // Note: user.solana_wallet_address might not exist in Prisma type yet, but we'll try to update it
           try {
             const currentWallet = (user as any).solana_wallet_address;
-            if (currentWallet !== body.solanaWalletAddress) {
+            const currentNoteEncPubKey = (user as any).note_enc_pub_key;
+            const needsUpdate = 
+              currentWallet !== body.solanaWalletAddress || 
+              (body.noteEncPubKey && currentNoteEncPubKey !== body.noteEncPubKey);
+            
+            if (needsUpdate) {
               req.log.info({ 
-                old: currentWallet, 
-                new: body.solanaWalletAddress 
-              }, "Updating solana_wallet_address in users table");
+                oldWallet: currentWallet, 
+                newWallet: body.solanaWalletAddress,
+                oldNoteEncPubKey: currentNoteEncPubKey,
+                newNoteEncPubKey: body.noteEncPubKey,
+              }, "Updating user fields in users table");
+              
+              const updateData: any = {};
+              if (currentWallet !== body.solanaWalletAddress) {
+                updateData.solana_wallet_address = body.solanaWalletAddress;
+              }
+              if (body.noteEncPubKey && currentNoteEncPubKey !== body.noteEncPubKey) {
+                updateData.note_enc_pub_key = body.noteEncPubKey;
+              }
               
               user = await prisma.users.update({
                 where: { id: user.id },
-                data: {
-                  solana_wallet_address: body.solanaWalletAddress,
-                } as any,
+                data: updateData,
               });
               
-              req.log.info({ userId: user.id.toString() }, "Updated solana_wallet_address successfully");
+              req.log.info({ userId: user.id.toString() }, "Updated user fields successfully");
             } else {
-              req.log.info("Wallet address unchanged, skipping update");
+              req.log.info("User fields unchanged, skipping update");
             }
           } catch (updateError: any) {
-            req.log.warn({ error: updateError?.message }, "Could not update solana_wallet_address (field may not exist in Prisma type yet)");
+            req.log.warn({ error: updateError?.message }, "Could not update user fields");
           }
           
           // Check if WSOL ATA already exists
