@@ -5,6 +5,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { prisma } from "../db/prisma.js";
 import { createClient, RedisClientType } from "redis";
 import { upsertNullifier } from "./nullifiers.js";
+import { getWithdrawMappingByTxSignature } from "./withdrawMapping.js";
 
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "http://localhost:8899";
 const PROGRAM_ID = process.env.SOLANA_PROGRAM_ID || "BCrt2kn5HR4B7CHEMSBacekhzVTKYhzAQAB5YNkr5kJf";
@@ -374,7 +375,7 @@ export class OnChainEventListener {
     });
 
     // Store in database
-    await this.storeWithdrawEvent(
+    const ownerKey = await this.storeWithdrawEvent(
       {
         nullifier: Array.from(nullifier),
         merkleRootUsed: Array.from(merkleRootUsed),
@@ -393,6 +394,7 @@ export class OnChainEventListener {
       recipient: recipient.toBase58(),
       txSignature,
       mint: mint.toBase58(),
+      ownerCipherpayPubkey: ownerKey ?? undefined,
     });
   }
 
@@ -492,13 +494,15 @@ export class OnChainEventListener {
     }
   }
 
-  private async storeWithdrawEvent(event: any, txSignature: string) {
+  private async storeWithdrawEvent(event: any, txSignature: string): Promise<string | null> {
     try {
       // Event nullifier comes as number[] (bytes from Anchor event)
       // Anchor events provide field elements as 32-byte arrays in little-endian format
       // Use the bytes directly to match nullifierToHex format
       const nullifierBytes = Buffer.from(event.nullifier);
       const nullifierHex = nullifierBytes.toString("hex");
+      const mapping = await getWithdrawMappingByTxSignature(txSignature);
+      const ownerKey = mapping?.owner_cipherpay_pub_key ?? null;
 
       // Store nullifier in nullifiers table
       await upsertNullifier(nullifierBytes, {
@@ -520,6 +524,7 @@ export class OnChainEventListener {
           signature: txSignature,
           event: "WithdrawCompleted",
           nullifier_hex: nullifierHex,
+          sender_key: ownerKey ?? null,
         },
         create: {
           chain: "solana",
@@ -529,12 +534,15 @@ export class OnChainEventListener {
           signature: txSignature,
           event: "WithdrawCompleted",
           nullifier_hex: nullifierHex,
+          sender_key: ownerKey ?? null,
         },
       });
 
       console.log(`[EventListener] Stored WithdrawCompleted (nullifier) in database`);
+      return ownerKey;
     } catch (error) {
       console.error("[EventListener] Failed to store WithdrawCompleted:", error);
+      return null;
     }
   }
 

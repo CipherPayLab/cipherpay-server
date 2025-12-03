@@ -21,11 +21,14 @@ import depositPrepare from "./routes/deposit.prepare.post.js";
 import depositSubmit from "./routes/deposit.submit.post.js";
 import transferPrepare from "./routes/transfer.prepare.post.js";
 import transferSubmit from "./routes/transfer.submit.post.js";
+import withdrawPrepare from "./routes/withdraw.prepare.post.js";
+import withdrawSubmit from "./routes/withdraw.submit.post.js";
 import nullifiersSync from "./routes/nullifiers.sync.post.js";
 import accountOverview from "./routes/account.overview.post.js";
 import messagesGet from "./routes/messages.get.js";
 import relayerInfo from "./routes/relayer.info.get.js";
 import usersNoteEncPubKey from "./routes/users.get.note-enc-pub-key.js";
+import withdrawMappingPost from "./routes/withdraw.map.post.js";
 
 const app = Fastify({ logger: true });
 
@@ -50,11 +53,14 @@ await app.register(depositPrepare);
 await app.register(depositSubmit);
 await app.register(transferPrepare);
 await app.register(transferSubmit);
+await app.register(withdrawPrepare);
+await app.register(withdrawSubmit);
 await app.register(nullifiersSync);
 await app.register(accountOverview);
 await app.register(messagesGet);
 await app.register(relayerInfo);
 await app.register(usersNoteEncPubKey);
+await app.register(withdrawMappingPost);
 
 // Start on-chain event monitoring
 eventListener.start().catch((err) => {

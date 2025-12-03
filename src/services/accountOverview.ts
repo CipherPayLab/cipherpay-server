@@ -1,8 +1,8 @@
 // Account Overview Service
 // Computes account overview (shielded balance, spendable notes, total notes) from decrypted notes
 
-import { poseidonHash } from "cipherpay-sdk";
 import { isNullifierSpent } from "./nullifiers.js";
+import { computeNullifierBigInt, nullifierToHex } from "./nullifierUtils.js";
 
 /**
  * Note structure (matches cipherpay-sdk/src/types/core.ts)
@@ -31,37 +31,6 @@ export interface AccountOverview {
 }
 
 /**
- * Compute nullifier from a note
- * Formula: Poseidon(ownerCipherPayPubKey, randomness.r, tokenId)
- * (Matches NullifierFromCipherKey template in circuits/nullifier/nullifier.circom)
- */
-export async function computeNullifier(note: Note): Promise<bigint> {
-  return poseidonHash([
-    note.ownerCipherPayPubKey,
-    note.randomness.r,
-    note.tokenId,
-  ]);
-}
-
-/**
- * Convert nullifier (bigint) to hex string (64 chars, no 0x prefix)
- * Field elements are represented as 32-byte little-endian values
- */
-export function nullifierToHex(nullifier: bigint): string {
-  // Convert bigint to 32-byte buffer (little-endian)
-  const buf = Buffer.allocUnsafe(32);
-  let n = nullifier;
-  
-  // Write as little-endian bytes
-  for (let i = 0; i < 32; i++) {
-    buf[i] = Number(n & 0xffn);
-    n = n >> 8n;
-  }
-  
-  return buf.toString("hex");
-}
-
-/**
  * Compute account overview from decrypted notes
  * Checks nullifier status for each note to determine if it's spent
  */
@@ -71,7 +40,11 @@ export async function computeAccountOverview(
 ): Promise<AccountOverview> {
   const results = await Promise.all(
     notes.map(async (note) => {
-      const nullifier = await computeNullifier(note);
+      const nullifier = await computeNullifierBigInt({
+        ownerCipherPayPubKey: note.ownerCipherPayPubKey,
+        randomnessR: note.randomness.r,
+        tokenId: note.tokenId,
+      });
       const nullifierHex = nullifierToHex(nullifier);
       const isSpent = await isNullifierSpent(nullifierHex, checkOnChain);
 

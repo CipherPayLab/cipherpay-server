@@ -155,3 +155,11 @@ model nullifiers {
   @@index([synced_at], map: "ix_nullifiers_synced")
   @@index([tx_signature], map: "ix_nullifiers_tx")
 }
+
+model withdraw_mappings {
+  id                      BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  tx_signature            String   @unique @db.VarChar(88)
+  nullifier_hex           String   @db.VarChar(64)
+  owner_cipherpay_pub_key String   @db.VarChar(66)
+  created_at              DateTime @default(now())
+}
