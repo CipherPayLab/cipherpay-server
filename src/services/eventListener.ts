@@ -374,7 +374,7 @@ export class OnChainEventListener {
     });
 
     // Store in database
-    await this.storeWithdrawEvent(
+    const ownerKey = await this.storeWithdrawEvent(
       {
         nullifier: Array.from(nullifier),
         merkleRootUsed: Array.from(merkleRootUsed),
@@ -393,11 +393,14 @@ export class OnChainEventListener {
       recipient: recipient.toBase58(),
       txSignature,
       mint: mint.toBase58(),
+      ownerCipherpayPubkey: ownerKey ?? undefined,
     });
   }
 
   private async storeDepositEvent(event: any, txSignature: string) {
     try {
+      const commitmentHex = toHex(event.commitment).replace(/^0x/, '');
+      
       await prisma.tx.upsert({
         where: { commitment: toHex(event.commitment) },
         update: {
@@ -417,6 +420,29 @@ export class OnChainEventListener {
           recipient_key: toHex(event.ownerCipherpayPubkey),
         },
       });
+
+      // Update the deposit message with the transaction signature
+      // The message was created during prepare/deposit with commitment_hex stored in nullifier_hex field
+      try {
+        const updated = await prisma.messages.updateMany({
+          where: {
+            nullifier_hex: commitmentHex, // Commitment stored in nullifier_hex field
+            kind: "note-deposit",
+          },
+          data: {
+            tx_signature: txSignature,
+          },
+        });
+        if (updated.count > 0) {
+          console.log(`[EventListener] Updated deposit message with tx signature: ${txSignature}`);
+        } else {
+          console.warn(`[EventListener] No deposit message found for commitment: ${commitmentHex}`);
+        }
+      } catch (msgError) {
+        console.error("[EventListener] Failed to update deposit message:", msgError);
+        // Don't fail the whole event processing if message update fails
+      }
+
       console.log(`[EventListener] Stored DepositCompleted in database`);
     } catch (error) {
       console.error("[EventListener] Failed to store DepositCompleted:", error);
@@ -486,19 +512,60 @@ export class OnChainEventListener {
         },
       });
 
+      // Update transfer messages with the transaction signature
+      // Both out1 and out2 messages were created during prepare/transfer with nullifier_hex
+      try {
+        const updated = await prisma.messages.updateMany({
+          where: {
+            nullifier_hex: nullifierHex,
+            kind: "note-transfer",
+          },
+          data: {
+            tx_signature: txSignature,
+          },
+        });
+        if (updated.count > 0) {
+          console.log(`[EventListener] Updated ${updated.count} transfer message(s) with tx signature: ${txSignature}`);
+        } else {
+          console.warn(`[EventListener] No transfer messages found for nullifier: ${nullifierHex}`);
+        }
+      } catch (msgError) {
+        console.error("[EventListener] Failed to update transfer messages:", msgError);
+        // Don't fail the whole event processing if message update fails
+      }
+
       console.log(`[EventListener] Stored TransferCompleted (2 commitments + nullifier) in database`);
     } catch (error) {
       console.error("[EventListener] Failed to store TransferCompleted:", error);
     }
   }
 
-  private async storeWithdrawEvent(event: any, txSignature: string) {
+  private async storeWithdrawEvent(event: any, txSignature: string): Promise<string | null> {
     try {
       // Event nullifier comes as number[] (bytes from Anchor event)
       // Anchor events provide field elements as 32-byte arrays in little-endian format
       // Use the bytes directly to match nullifierToHex format
       const nullifierBytes = Buffer.from(event.nullifier);
       const nullifierHex = nullifierBytes.toString("hex");
+      
+      // Get owner key from the withdraw message (created during prepare phase)
+      // The message's recipient_key is the owner's CipherPay pubkey
+      let ownerKey: string | null = null;
+      try {
+        const message = await prisma.messages.findFirst({
+          where: {
+            nullifier_hex: nullifierHex,
+            kind: "note-withdraw",
+          },
+          select: {
+            recipient_key: true,
+          },
+        });
+        ownerKey = message?.recipient_key ?? null;
+      } catch (msgError) {
+        console.error("[EventListener] Failed to find withdraw message for owner key:", msgError);
+        // Continue without owner key - it's optional
+      }
 
       // Store nullifier in nullifiers table
       await upsertNullifier(nullifierBytes, {
@@ -520,6 +587,7 @@ export class OnChainEventListener {
           signature: txSignature,
           event: "WithdrawCompleted",
           nullifier_hex: nullifierHex,
+          sender_key: ownerKey ?? null,
         },
         create: {
           chain: "solana",
@@ -529,12 +597,37 @@ export class OnChainEventListener {
           signature: txSignature,
           event: "WithdrawCompleted",
           nullifier_hex: nullifierHex,
+          sender_key: ownerKey ?? null,
         },
       });
 
+      // Update the withdraw message with the transaction signature
+      // The message was created during prepare/withdraw with nullifier_hex
+      try {
+        const updated = await prisma.messages.updateMany({
+          where: {
+            nullifier_hex: nullifierHex,
+            kind: "note-withdraw",
+          },
+          data: {
+            tx_signature: txSignature,
+          },
+        });
+        if (updated.count > 0) {
+          console.log(`[EventListener] Updated withdraw message with tx signature: ${txSignature}`);
+        } else {
+          console.warn(`[EventListener] No withdraw message found for nullifier: ${nullifierHex}`);
+        }
+      } catch (msgError) {
+        console.error("[EventListener] Failed to update withdraw message:", msgError);
+        // Don't fail the whole event processing if message update fails
+      }
+
       console.log(`[EventListener] Stored WithdrawCompleted (nullifier) in database`);
+      return ownerKey;
     } catch (error) {
       console.error("[EventListener] Failed to store WithdrawCompleted:", error);
+      return null;
     }
   }
 
