@@ -5,7 +5,7 @@ import { TOKENS, bigintifySignals } from "cipherpay-sdk"; // shared registry + h
 export const Hex0xZ = z.string().regex(/^0x[0-9a-fA-F]+$/);
 
 /** Allowed message kinds (kept narrow so UI/server stay in sync) */
-export const KnownKindsZ = z.enum(["note-transfer", "note-deposit", "note-message"]);
+export const KnownKindsZ = z.enum(["note-transfer", "note-deposit", "note-message", "note-withdraw"]);
 
 /** Validate a token identifier against the SDK registry */
 export const TokenIdZ = z

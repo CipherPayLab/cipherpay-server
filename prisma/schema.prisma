@@ -73,12 +73,16 @@ model messages {
   ciphertext    Bytes
   kind          String    @db.VarChar(24)
   content_hash  String    @unique(map: "uq_messages_content_hash") @db.VarChar(66)
+  nullifier_hex String?   @db.VarChar(64)  // For withdraw messages: link to nullifier
+  tx_signature  String?   @db.VarChar(88)   // For withdraw messages: transaction signature (updated by event listener)
   created_at    DateTime  @default(now()) @db.Timestamp(0)
   read_at       DateTime? @db.Timestamp(0)
 
   @@index([read_at], map: "ix_messages_read_at")
   @@index([recipient_key, created_at(sort: Desc)], map: "ix_messages_recipient_created")
   @@index([sender_key, created_at(sort: Desc)], map: "ix_messages_sender_created")
+  @@index([nullifier_hex], map: "ix_messages_nullifier_hex")
+  @@index([tx_signature], map: "ix_messages_tx_signature")
 }
 
 model tx {
@@ -154,12 +158,4 @@ model nullifiers {
   @@index([used], map: "ix_nullifiers_used")
   @@index([synced_at], map: "ix_nullifiers_synced")
   @@index([tx_signature], map: "ix_nullifiers_tx")
-}
-
-model withdraw_mappings {
-  id                      BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  tx_signature            String   @unique @db.VarChar(88)
-  nullifier_hex           String   @db.VarChar(64)
-  owner_cipherpay_pub_key String   @db.VarChar(66)
-  created_at              DateTime @default(now())
 }

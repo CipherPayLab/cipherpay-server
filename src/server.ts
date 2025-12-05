@@ -28,7 +28,6 @@ import accountOverview from "./routes/account.overview.post.js";
 import messagesGet from "./routes/messages.get.js";
 import relayerInfo from "./routes/relayer.info.get.js";
 import usersNoteEncPubKey from "./routes/users.get.note-enc-pub-key.js";
-import withdrawMappingPost from "./routes/withdraw.map.post.js";
 
 const app = Fastify({ logger: true });
 
@@ -60,7 +59,6 @@ await app.register(accountOverview);
 await app.register(messagesGet);
 await app.register(relayerInfo);
 await app.register(usersNoteEncPubKey);
-await app.register(withdrawMappingPost);
 
 // Start on-chain event monitoring
 eventListener.start().catch((err) => {

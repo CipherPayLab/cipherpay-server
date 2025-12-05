@@ -9,7 +9,7 @@ import { KnownKindsZ } from "../validation/sdk.js";
  * Body:
  *  - recipientKey: 0x... (ownerCipherPayPubKey of recipient)
  *  - ciphertextB64: base64-encoded encrypted envelope (opaque to server)
- *  - kind: "note-transfer" | "note-deposit" | "note-message"
+ *  - kind: "note-transfer" | "note-deposit" | "note-message" | "note-withdraw"
  *  - senderKey?: 0x... (optional, sender's ownerCipherPayPubKey)
  *
  * Returns:
@@ -26,6 +26,7 @@ export default async function (app: FastifyInstance) {
       ciphertextB64: z.string().min(1, "ciphertextB64 required"),
       kind: KnownKindsZ.default("note-transfer"),
       senderKey: z.string().regex(/^0x[0-9a-fA-F]+$/).optional(),
+      nullifierHex: z.string().regex(/^[0-9a-fA-F]{64}$/).optional(), // For withdraw messages
     });
 
     const body = BodyZ.parse(req.body);
@@ -69,6 +70,7 @@ export default async function (app: FastifyInstance) {
           ciphertext,
           kind: body.kind,
           content_hash: h,
+          nullifier_hex: body.nullifierHex ?? null,
         },
         select: { id: true },
       });
